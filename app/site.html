@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="物流综合轨迹展示：直接查询众乐国际物流数据，支持批量单号、状态筛选、全程轨迹与导出。">
+  <meta name="theme-color" content="#166451"><title>物流综合轨迹展示 · Tracking</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23166451'/%3E%3Cpath d='M8 11l8-4 8 4v10l-8 4-8-4zm0 0l8 4 8-4M16 15v10' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./readability.css"><script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar"><div class="top-inner">
+    <a href="#" class="brand" aria-label="物流追踪首页"><span class="brand-mark" data-icon="box"></span><span>物流追踪<small>LOGISTICS TRACKING</small></span></a>
+    <nav aria-label="主导航"><span class="nav-active">轨迹查询</span><button class="text-btn" id="help">使用说明 <span data-icon="help"></span></button></nav>
+    <span class="source-tag"><i></i> 多承运商 · 统一追踪</span>
+  </div></header>
+  <main class="shell">
+    <div class="page-heading"><div><div class="eyebrow">SHIPMENT VISIBILITY</div><h1>物流综合轨迹展示<span class="heading-dot">.</span></h1><p>从发货到签收，每一步都清晰可见。</p></div><div class="reading-control"><label for="reading-size">Aa <span>字号</span></label><select id="reading-size" aria-label="页面字号"><option value="16">标准</option><option value="18">大</option><option value="20">特大</option><option value="22">超大</option></select></div></div>
+    <section class="service-banner" aria-live="polite"><div><strong id="service-title">正在检查数据源…</strong><p id="service-message">多承运商查询由 Ship24 提供，众乐作为补充数据源。</p></div><button id="setup" class="secondary" type="button">接入设置</button></section>
+    <div class="workspace">
+      <aside>
+        <section class="panel query-panel"><div class="panel-title"><span class="icon-tile" data-icon="search"></span><h2>查询运单</h2><span class="pill">批量查询</span></div>
+          <form id="query-form"><label for="provider">查询范围</label><select id="provider" class="field-select"><option value="auto">自动选择 · 全球物流 + 众乐</option><option value="ship24">全球物流 · Ship24</option><option value="zhongle">仅众乐国际</option></select><p class="field-help">自动模式：BG 系统单号查众乐，其他单号查全球物流。</p><label for="numbers">运单号</label><p class="field-help">每行输入一个单号，最多支持 20 个</p>
+            <div class="input-wrap"><textarea id="numbers" rows="7" spellcheck="false" placeholder="请输入系统单号、客户单号或转单号&#10;&#10;例如：BG2608182036" aria-describedby="input-error"></textarea><div class="input-bottom"><span id="input-count">0 / 20 个单号</span><button type="button" id="clear" class="text-btn">清空</button></div></div>
+            <details class="query-options"><summary>指定承运商 / 补充查询条件</summary><p class="field-help">选填，应用于本次所有单号。准确条件可减少同号误匹配。</p><label for="courier-code">承运商（默认自动识别）</label><input id="courier-code" class="field-input" list="courier-list" placeholder="启用后可搜索全部承运商" disabled><datalist id="courier-list"></datalist><p id="courier-hint" class="field-help">目录将在 Ship24 配置后加载。</p><label for="country-code">目的国家 / 地区代码</label><input id="country-code" class="field-input" placeholder="例如 US、CN、GB" maxlength="3"><label for="post-code">目的地邮编</label><input id="post-code" class="field-input" placeholder="按承运商要求填写" maxlength="32"><label for="shipping-date">发货日期</label><input id="shipping-date" class="field-input" type="date"></details>
+            <p id="input-error" class="error-text" role="alert"></p><button class="primary query-button" type="submit" id="query"><span data-icon="search"></span> 查询物流轨迹 <span class="arrow">→</span></button>
+            <button type="button" id="cancel" class="secondary cancel" hidden>停止查询</button>
+          </form>
+          <div class="example"><span>试试参考运单</span><button id="example">BG2608182036 <span>↗</span></button></div>
+        </section>
+        <section class="connection-card"><span class="connection-icon" data-icon="link"></span><div><strong>全球物流 + 众乐国际</strong><p>聚合查询覆盖国际快递、邮政和跨境专线。具体承运商以启用后的服务目录为准。</p><button id="show-carriers" class="text-btn" type="button">查看承运商目录 →</button><a href="https://gzzlgj.nextsls.com/tracking/app#/tracking" target="_blank" rel="noopener noreferrer">前往原站查询 <span>↗</span></a></div></section>
+        <div class="side-note"><span data-icon="shield"></span><p>仅查询你输入的单号<br>本站不建运单数据库</p></div>
+      </aside>
+      <section class="results" aria-label="查询结果">
+        <div class="stats" id="stats" aria-label="按状态筛选"></div>
+        <div class="results-toolbar"><div><h2>查询结果 <span id="result-count">0</span></h2><p id="query-status" role="status">输入运单号，开始追踪你的货物</p></div><div class="toolbar-actions"><button id="refresh" class="secondary" disabled><span data-icon="refresh"></span><span>刷新</span></button><button id="export" class="secondary" disabled><span data-icon="download"></span><span>导出</span></button></div></div>
+        <div id="result-list" aria-live="polite"></div>
+      </section>
+    </div>
+    <footer><span class="footer-brand">TRACKING <span>/</span> 让物流信息更透明</span><span>数据来源：Ship24（需配置） / 众乐国际</span></footer>
+  </main>
+  <div id="toast" role="status" hidden></div>
+  <dialog id="help-dialog"><button id="close-help" class="dialog-close" aria-label="关闭使用说明">×</button><div class="eyebrow">QUICK GUIDE</div><h2>每一票货物，一目了然</h2><ol><li>输入系统单号、客户单号或转单号。支持换行、逗号或分号分隔，最多 20 个不同单号。</li><li>点击查询，逐票向选定数据源查询。Ship24 首次查询最长可能需约 1 分钟；已建立追踪的运单会返回服务端最新结果。</li><li>点击状态卡片筛选结果；展开运单可搜索、排序完整物流轨迹。</li><li>“导出”下载本次全部成功结果的 CSV；“复制链接”可再次打开指定运单。</li></ol><p>时间按数据源返回值显示；如包含时区偏移会保留，不推测未提供的时区。原站接口不可用时会显示失败，可稍后刷新或前往原站核验。</p><p>本站为独立查询工具。运单将提交给选定的物流数据服务，Ship24 会创建并持续维护追踪记录，可能消耗账号额度；本站不建运单数据库。单号会出现在当前页面链接中，额外查询条件不会写入链接。</p><button id="help-done" class="primary">开始查询</button></dialog>
+<dialog id="setup-dialog"><button id="close-setup" class="dialog-close" aria-label="关闭接入设置">×</button><div class="eyebrow">GLOBAL TRACKING</div><h2>启用全球物流查询</h2><p id="setup-status">正在读取接入状态…</p><ol><li>在 Ship24 注册账号，选择 <strong>Tracking API &amp; Webhook · Per-shipment</strong> 套餐。免费试用配额和价格以服务商页面为准。</li><li>在 Ship24 后台的 API Keys 页面创建密钥。</li><li>部署时将密钥设为服务端环境变量 <code>SHIP24_API_KEY</code>。请勿填写到聊天、前端文件或 GitHub。</li><li>刷新本页即可加载承运商目录并开始查询。</li></ol><p>相同参数重复查询不会重复创建追踪；修改承运商、目的地或发货日期可能创建新的追踪并消耗额度。个别渠道需要邮编、账号或其他补充信息，不能保证所有包裹都能查到。</p><div class="fallback-actions"><a class="primary" href="https://dashboard.ship24.com/" target="_blank" rel="noopener noreferrer">前往 Ship24 注册 / 获取密钥 ↗</a><button id="check-connection" class="secondary">重新检查连接</button></div><p id="connection-result" role="status"></p></dialog>
+<dialog id="carriers-dialog"><button id="close-carriers" class="dialog-close" aria-label="关闭承运商目录">×</button><h2>承运商目录</h2><p id="carrier-summary">配置 Ship24 后，实时载入全部可用承运商。</p><input id="carrier-search" class="field-input" placeholder="按名称、代码或国家搜索" aria-label="搜索承运商"><div id="carrier-results" class="carrier-results"></div><p>常见国际快递包括 UPS、FedEx、DHL、USPS；其他渠道是否可用，以账号返回的目录与查询结果为准。</p></dialog>
+</body></html>

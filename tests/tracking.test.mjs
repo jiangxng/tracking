@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNumbers, validateNumbers, normalizeResponse, category, toCSV } from '../dist/tracking.js';
+import { parseNumbers, validateNumbers, normalizeResponse, category, toCSV, carrierLink } from '../public/tracking.js';
+test('UPS 单号提供官网入口，源站无记录不误判单号无效', () => {
+  assert.equal(carrierLink('1Z1B0D750317229126').url, 'https://www.ups.com/track?loc=zh_CN&tracknum=1Z1B0D750317229126');
+  assert.equal(carrierLink('1z1b0d750317229126').name, 'UPS');
+  assert.equal(carrierLink('BG2608182036'), null);
+  assert.equal(carrierLink('1Z<script>'), null);
+  const r = normalizeResponse({status:0,info:'抱歉！操作失败，请重新操作。'}, '1Z1B0D750317229126');
+  assert.equal(r.state, 'missing'); assert.match(r.message, /众乐数据源/); assert.equal(r.sourceMessage, '抱歉！操作失败，请重新操作。');
+});
 test('批量输入去重、中文分隔符及数量限制', () => {
   assert.deepEqual(parseNumbers('BG1\nBG2，BG1; BG3；BG4'), ['BG1','BG2','BG3','BG4']);
   assert.ok(validateNumbers([])); assert.ok(validateNumbers(Array.from({length:21},(_,i)=>String(i))));
