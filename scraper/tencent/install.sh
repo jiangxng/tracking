@@ -25,7 +25,7 @@ docker compose version >/dev/null
 docker network inspect "$network" >/dev/null
 available_kib="$(awk '/MemAvailable:/ { print $2 }' /proc/meminfo)"
 free_kib="$(df -Pk /var/lib/docker | awk 'NR==2 { print $4 }')"
-if (( available_kib < 1200000 || free_kib < 4000000 )); then
+if (( available_kib < 1800000 || free_kib < 4000000 )); then
   echo "Insufficient capacity for Chromium: available RAM ${available_kib} KiB, Docker disk ${free_kib} KiB." >&2
   exit 1
 fi
@@ -53,7 +53,7 @@ install -d -m 0700 "$DOCKER_CONFIG"
 compose="$release/scraper/tencent/compose.yaml"
 snippet="$release/scraper/tencent/Caddyfile.snippet"
 docker compose --env-file "$root/.env" -f "$compose" config --quiet
-docker compose --env-file "$root/.env" -f "$compose" up -d --build
+docker compose --env-file "$root/.env" -f "$compose" up -d --build --wait --wait-timeout 180
 docker compose --env-file "$root/.env" -f "$compose" ps
 
 tracking_present=0

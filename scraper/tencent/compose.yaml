@@ -28,12 +28,28 @@ services:
       SCRAPER_MAX_CONCURRENT: "2"
       SCRAPER_RATE_LIMIT: "20"
       SCRAPER_CACHE_MS: "600000"
+      FLARESOLVERR_URL: http://tracking-trawl:8191
     expose:
       - "8080"
     networks:
       evo:
         aliases:
           - tracking-scraper
+    logging:
+      options: {max-size: "10m", max-file: "3"}
+  trawl:
+    image: ghcr.io/plhery/universal-parcel-scraper-trawl:0.495.1
+    restart: unless-stopped
+    shm_size: "256m"
+    mem_limit: "1400m"
+    environment:
+      LOG_LEVEL: warn
+    expose:
+      - "8191"
+    networks:
+      evo:
+        aliases:
+          - tracking-trawl
     logging:
       options: {max-size: "10m", max-file: "3"}
 
