@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {publicConfig,trackShipment,normalizeUPS,normalizeDHL,normalizeFedEx,normalizeUSPS,normalizeKarrio} from '../lib/free-tracking-service.mjs';
+import {publicConfig,trackShipment,normalizeUPS,normalizeDHL,normalizeFedEx,normalizeUSPS,normalizeKarrio,normalizeScraper,getCouriers} from '../lib/free-tracking-service.mjs';
 
 const response=(body,status=200)=>({ok:status>=200&&status<300,status,json:async()=>body});
 test('未配置时准确呈现状态，未知单号不猜测承运商',async()=>{
@@ -43,4 +43,23 @@ test('USPS 仅在配置账号后调用官方追踪接口',async()=>{
  assert.equal(r.shipment.status,'delivered');
  assert.equal(calls[1].url,'https://apis.usps.com/tracking/v3/tracking/9400000000?expand=DETAIL');
  assert.equal(calls[1].options.headers.Authorization,'Bearer mock-token');
+});
+test('网页抓取优先，轨迹归一化并传入邮编',async()=>{
+ const calls=[];
+ const fetcher=async(url,options)=>{calls.push({url:String(url),options});return response({carrier:'ups',source:'ups',result:{current_stage:'delivered',last_status_text:'Delivered',events:[{time:'2026-11-03 10:00',description:'Picked up'},{time:'2026-11-04 11:00',description:'Delivered',location:'Shanghai'}]}})};
+ const r=await trackShipment({number:'1Z1B0D750317229126',provider:'auto',destinationPostCode:'200000'},{SCRAPER_BASE_URL:'https://scraper.example.org',SCRAPER_TOKEN:'secret'},fetcher);
+ assert.equal(r.source,'scraper');assert.equal(r.shipment.status,'delivered');assert.equal(r.shipment.traces[0].info,'Delivered · Shanghai');
+ assert.deepEqual(JSON.parse(calls[0].options.body),{number:'1Z1B0D750317229126',carrier:'ups',postcode:'200000'});
+ assert.equal(calls[0].options.headers.Authorization,'Bearer secret');
+});
+test('网页抓取遇到网站验证时返回明确错误，不伪造无记录',async()=>{
+ await assert.rejects(trackShipment({number:'1Z1B0D750317229126',provider:'scraper'},{SCRAPER_BASE_URL:'https://scraper.example.org',SCRAPER_TOKEN:'secret'},async()=>response({hint:{kind:'challenge'}},502)),/网站要求验证/);
+ assert.equal(normalizeScraper({carrier:'ups',result:{summary_only:true,last_status_text:'Label created'}},'1Z1B0D750317229126').shipment.summary,'Label created');
+});
+test('网页抓取目录来自服务端，无法连接时保留基础入口',async()=>{
+ const env={SCRAPER_BASE_URL:'https://scraper.example.org',SCRAPER_TOKEN:'secret'};
+ const available=await getCouriers(env,async()=>response({ups:{displayName:'UPS'},'royal-mail':{displayName:'Royal Mail'}}));
+ assert.equal(available.enabled,true);assert.ok(available.couriers.some(c=>c.code==='royal-mail'&&c.kind==='scraper'));
+ const offline=await getCouriers(env,async()=>response({},502));
+ assert.equal(offline.enabled,false);assert.ok(offline.couriers.some(c=>c.code==='scraper'));
 });

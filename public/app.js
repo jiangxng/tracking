@@ -40,8 +40,8 @@ function readQueryOptions() {
 function renderCouriers() {
   const term=$('carrier-search').value.toLowerCase();
   const list=couriers.filter(c=>`${c.name} ${c.code} ${c.country}`.toLowerCase().includes(term));
-  $('carrier-summary').textContent=`本项目有 ${couriers.length} 个接入入口，当前匹配 ${list.length} 个。Karrio 实际可用承运商取决于自托管实例及各物流商授权。`;
-  $('carrier-results').innerHTML=list.map(c=>`<div class="carrier-row"><strong>${escape(c.name)}</strong><span>${escape(c.code)} · ${c.enabled?'已配置':'待配置'}</span></div>`).join('');
+  $('carrier-summary').textContent=`目录中有 ${couriers.length} 个入口，当前匹配 ${list.length} 个。网页抓取适配器不保证每票可查。`;
+  $('carrier-results').innerHTML=list.slice(0,100).map(c=>`<div class="carrier-row"><strong>${escape(c.name)}</strong><span>${escape(c.code)} · ${c.kind==='scraper'?'网页抓取适配器':c.enabled||c.configured?'已配置':'待配置'}</span></div>`).join('')+(list.length>100?'<p>显示前 100 项，请输入关键词缩小范围。</p>':'');
 }
 async function loadConnection() {
   $('check-connection').disabled=true;
@@ -51,12 +51,12 @@ async function loadConnection() {
     const config=await response.json();
     const enabled=config.providers.filter(p=>p.enabled);
     $('service-title').textContent='免费数据源 · '+enabled.map(p=>p.name).join(' / ');
-    $('service-message').textContent='已接入 '+enabled.length+' / '+config.providers.length+' 个数据源。UPS、DHL、FedEx、USPS 需各自账号授权；Karrio 需自托管。';
+    $('service-message').textContent='已接入 '+enabled.length+' / '+config.providers.length+' 个数据源。自动查询优先使用网页抓取；抓取服务未配置时按单号尝试已授权的官方接口。';
     $('setup-status').textContent=config.providers.map(p=>p.name+'：'+(p.enabled?'已配置':'待配置')).join('；');
     $('connection-result').textContent='配置状态已更新。';
-    couriers=config.providers.map(p=>({...p,code:p.id,country:'',requiredFields:[]}));
-    $('courier-code').disabled=busy||$('provider').value!=='karrio';
-    $('courier-hint').textContent='Karrio 承运商代码，例如 ups、usps；其他数据源留空。';
+    couriers=config.providers.map(p=>({...p,code:p.id,country:'',requiredFields:[],kind:'provider'}));
+    $('courier-code').disabled=busy||!['scraper','karrio'].includes($('provider').value);
+    $('courier-hint').textContent='网页抓取或 Karrio 可填写承运商代码，例如 ups、usps；其他数据源留空。';
     renderCouriers();
   } catch(e) {
     $('service-title').textContent='数据源连接待检查'; $('service-message').textContent=e.message;
@@ -78,7 +78,7 @@ function renderStats() {
   $('query').disabled = busy;
   $('cancel').hidden = !busy;
   for (const id of ['provider','country-code','post-code','shipping-date']) $(id).disabled=busy;
-  $('courier-code').disabled=busy || $('provider').value!=='karrio';
+  $('courier-code').disabled=busy || !['scraper','karrio'].includes($('provider').value);
   $('numbers').disabled = busy; $('example').disabled = busy; $('clear').disabled = busy;
 }
 function traceHTML(record, view) {
@@ -99,11 +99,11 @@ function cardHTML(record, index) {
   if (!s) {
     const carrier = carrierLink(record.number);
     const unavailable = ['error', 'missing', 'unconfigured', 'waiting', 'ambiguous'].includes(record.state);
-    return `<article class="shipment" data-index="${index}">${title}<div class="message-card"><div><p>${escape(record.message || (record.state === 'loading' ? '正在查询物流数据，首次全球查询可能需要约 1 分钟…' : record.state === 'cancelled' ? '查询已停止，可点击刷新重新查询。' : '等待前面的运单查询完成…'))}</p>${unavailable ? `<p class="source-detail">${carrier ? '此单号符合 UPS 格式，也可前往 UPS 官网核验。' : (record.source !== 'zhongle' ? '可检查接入设置，或补充准确的承运商与目的地后重试。' : '如有对应的众乐系统单号或客户单号，可用它再次查询。')}</p>` : ''}${record.sourceMessage ? `<details class="source-detail"><summary>查看原站提示</summary>${escape(record.sourceMessage)}</details>` : ''}</div>${unavailable ? `<div class="fallback-actions">${carrier ? `<a class="primary carrier-link" href="${escape(carrier.url)}" target="_blank" rel="noopener noreferrer">${carrier.name} 官网查询 ↗</a>` : ''}<button class="secondary" data-action="retry" ${busy ? 'disabled' : ''}>重新查询</button></div>` : ''}</div>${record.state === 'loading' ? '<div class="pending-line"></div>' : ''}</article>`;
+    return `<article class="shipment" data-index="${index}">${title}<div class="message-card"><div><p>${escape(record.message || (record.state === 'loading' ? '正在向物流数据源查询，网页抓取可能需要约 1 分钟…' : record.state === 'cancelled' ? '查询已停止，可点击刷新重新查询。' : '等待前面的运单查询完成…'))}</p>${unavailable ? `<p class="source-detail">${carrier ? '此单号符合 UPS 格式，也可前往 UPS 官网核验。' : (record.source !== 'zhongle' ? '可检查接入设置，或补充准确的承运商与目的地后重试。' : '如有对应的众乐系统单号或客户单号，可用它再次查询。')}</p>` : ''}${record.sourceMessage ? `<details class="source-detail"><summary>查看原站提示</summary>${escape(record.sourceMessage)}</details>` : ''}</div>${unavailable ? `<div class="fallback-actions">${carrier ? `<a class="primary carrier-link" href="${escape(carrier.url)}" target="_blank" rel="noopener noreferrer">${carrier.name} 官网查询 ↗</a>` : ''}<button class="secondary" data-action="retry" ${busy ? 'disabled' : ''}>重新查询</button></div>` : ''}</div>${record.state === 'loading' ? '<div class="pending-line"></div>' : ''}</article>`;
   }
   const datum = (name, value, cls = '') => `<div class="datum ${cls}"><label>${name}</label><div class="number">${escape(value || '—')}</div></div>`;
   const latest = s.traces[0];
-  return `<article class="shipment" data-index="${index}">${title}<div class="shipment-info">${datum('目的国家 / 地区',s.country)}${datum('目的地邮编',s.postcode)}${datum('包裹件数',s.parcel_count ? s.parcel_count + ' 件' : '')}${datum(record.source !== 'zhongle' ? '查询单号' : '系统单号',s.shipment_id)}${record.source !== 'zhongle' ? datum('运输服务',s.service) : datum('客户单号',s.client_reference)}${datum('转单号',s.outer_carrier_tracking_number,'transfer')}${s.ext_number ? datum('外部单号',s.ext_number) : ''}${s.eta ? datum('预计送达',s.eta) : ''}</div><div class="latest">${icon(badgeIcon)}<div class="latest-content"><strong>${escape(latest?.info || '等待物流轨迹更新')}</strong><small>${escape(latest?.time || '')}</small></div><button class="text-btn" data-action="toggle" aria-expanded="${view.expanded}" aria-controls="details-${index}">${view.expanded ? '收起轨迹' : '展开轨迹'} ${icon('chevron')}</button></div><div id="details-${index}" ${view.expanded ? '' : 'hidden'}><div class="timeline-toolbar"><strong>物流轨迹 <span>${s.traces.length} 条动态</span></strong><div class="timeline-controls"><input class="trace-search" aria-label="搜索 ${escape(record.number)} 的轨迹" placeholder="搜索轨迹" value="${escape(view.keyword)}"><button class="sort-button" data-action="sort">${view.ascending ? '↑ 最早在前' : '↓ 最新在前'}</button></div></div><ol class="timeline">${traceHTML(record, view)}</ol></div><div class="card-foot"><span>来源：${record.source === 'zhongle' ? '众乐国际' : record.source.toUpperCase()} · 时间按源数据原样显示</span><div><button class="text-btn" data-action="copy-link" >复制查询链接</button><span> &nbsp; / &nbsp; </span>${record.source !== 'zhongle' ? (carrierLink(record.number) ? `<a href="${carrierLink(record.number).url}" target="_blank" rel="noopener noreferrer">承运商核验 ↗</a>` : '承运商轨迹') : `<a href="https://gzzlgj.nextsls.com/tracking/app#/tracking?numbers=${encodeURIComponent(record.number)}" target="_blank" rel="noopener noreferrer">原站核验 ↗</a>`}</div></div></article>`;
+  return `<article class="shipment" data-index="${index}">${title}<div class="shipment-info">${datum('目的国家 / 地区',s.country)}${datum('目的地邮编',s.postcode)}${datum('包裹件数',s.parcel_count ? s.parcel_count + ' 件' : '')}${datum(record.source !== 'zhongle' ? '查询单号' : '系统单号',s.shipment_id)}${record.source !== 'zhongle' ? datum('运输服务',s.service) : datum('客户单号',s.client_reference)}${datum('转单号',s.outer_carrier_tracking_number,'transfer')}${s.ext_number ? datum('外部单号',s.ext_number) : ''}${s.eta ? datum('预计送达',s.eta) : ''}</div><div class="latest">${icon(badgeIcon)}<div class="latest-content"><strong>${escape(latest?.info || s.summary || '等待物流轨迹更新')}</strong><small>${escape(latest?.time || '')}</small></div><button class="text-btn" data-action="toggle" aria-expanded="${view.expanded}" aria-controls="details-${index}">${view.expanded ? '收起轨迹' : '展开轨迹'} ${icon('chevron')}</button></div><div id="details-${index}" ${view.expanded ? '' : 'hidden'}><div class="timeline-toolbar"><strong>物流轨迹 <span>${s.traces.length} 条动态</span></strong><div class="timeline-controls"><input class="trace-search" aria-label="搜索 ${escape(record.number)} 的轨迹" placeholder="搜索轨迹" value="${escape(view.keyword)}"><button class="sort-button" data-action="sort">${view.ascending ? '↑ 最早在前' : '↓ 最新在前'}</button></div></div><ol class="timeline">${traceHTML(record, view)}</ol>${s.history_note ? `<p class="source-detail">${escape(s.history_note)}</p>` : ''}</div><div class="card-foot"><span>来源：${record.source === 'zhongle' ? '众乐国际' : record.source.toUpperCase()} · 时间按源数据原样显示</span><div><button class="text-btn" data-action="copy-link" >复制查询链接</button><span> &nbsp; / &nbsp; </span>${record.source !== 'zhongle' ? (carrierLink(record.number) ? `<a href="${carrierLink(record.number).url}" target="_blank" rel="noopener noreferrer">承运商核验 ↗</a>` : '承运商轨迹') : `<a href="https://gzzlgj.nextsls.com/tracking/app#/tracking?numbers=${encodeURIComponent(record.number)}" target="_blank" rel="noopener noreferrer">原站核验 ↗</a>`}</div></div></article>`;
 }
 function render() {
   renderStats();
@@ -176,8 +176,8 @@ for (const id of ['close-help','help-done']) $(id).addEventListener('click', () 
 $('setup').addEventListener('click',()=> $('setup-dialog').showModal());
 $('close-setup').addEventListener('click',()=> $('setup-dialog').close());
 $('check-connection').addEventListener('click',loadConnection);
-$('provider').addEventListener('change',()=>{$('courier-code').disabled=$('provider').value!=='karrio';});
-$('show-carriers').addEventListener('click',()=>{renderCouriers();$('carriers-dialog').showModal();});
+$('provider').addEventListener('change',()=>{$('courier-code').disabled=!['scraper','karrio'].includes($('provider').value);});
+$('show-carriers').addEventListener('click',async()=>{renderCouriers();$('carriers-dialog').showModal();try{const response=await fetch('/api/couriers',{cache:'no-store'});if(response.ok){const data=await response.json();if(Array.isArray(data.couriers)){couriers=data.couriers;renderCouriers();}}}catch{/* 保留基础目录。 */}});
 $('close-carriers').addEventListener('click',()=> $('carriers-dialog').close());
 $('carrier-search').addEventListener('input',renderCouriers);
 $('courier-code').addEventListener('input',()=>{const c=couriers.find(c=>c.code===$('courier-code').value);$('courier-hint').textContent=c?.requiredFields.length?`此承运商需要：${c.requiredFields.join(' / ')}。无法提供必要信息时可能查不到结果。`:'留空自动识别，或从目录中选择承运商。';});

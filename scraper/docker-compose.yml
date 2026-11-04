@@ -1,0 +1,11 @@
+services:
+  parcel-scraper:
+    image: ghcr.io/plhery/universal-parcel-scraper:0.637.1
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SCRAPER_TOKEN: ${SCRAPER_TOKEN:?Set a long random SCRAPER_TOKEN before starting}
+      SCRAPER_MAX_CONCURRENT: "2"
+      SCRAPER_RATE_LIMIT: "20"
+      SCRAPER_CACHE_MS: "600000"
+    restart: unless-stopped
