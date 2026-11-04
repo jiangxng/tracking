@@ -45,6 +45,11 @@ if [[ ! -f "$root/.env" ]]; then
   printf 'SCRAPER_TOKEN=%s\n' "$(openssl rand -hex 32)" > "$root/.env"
 fi
 chmod 0600 "$root/.env"
+# EVO keeps its own GHCR login in the deploy user's Docker config. The public
+# scraper image is anonymously pullable; isolate tracking so that an unrelated
+# GHCR credential cannot cause a denied response for this package.
+export DOCKER_CONFIG="$root/docker-config"
+install -d -m 0700 "$DOCKER_CONFIG"
 compose="$release/scraper/tencent/compose.yaml"
 snippet="$release/scraper/tencent/Caddyfile.snippet"
 docker compose --env-file "$root/.env" -f "$compose" config --quiet

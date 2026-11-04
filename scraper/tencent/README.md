@@ -11,4 +11,6 @@
 
 `install.sh` 要以现有 `evo-deploy` 账户运行，例如从 Ubuntu 控制台执行 `sudo -u evo-deploy bash /tmp/tracking-install.sh <已核实的40位commit SHA>`。脚本先核对 EVO Caddy、Docker 网络、至少约 1.2 GB 可用内存和 4 GB Docker 磁盘空间；不满足时会停止。它不会打印生成的抓取令牌。首次写入 Caddyfile 前会备份，验证或 reload 失败时恢复原文件。脚本要求服务器能访问 GitHub；请先在 GitHub 核对要部署的 SHA 与脚本内容。
 
+tracking 使用独立的空 Docker 凭据目录匿名拉取公开镜像，以免 EVO 保存的 GHCR 登录凭据影响抓取器镜像拉取；不会注销或覆盖 EVO 的 Docker 凭据。
+
 抓取项目对网页改版及网站验证敏感；`1Z1B0D750317229126` 的普通 HTTP 抓取已遇到验证拦截，Chromium 方式是否能取得轨迹必须在实际服务器上测试。此服务不使用 Railway，不依赖物流商 API 密钥。`SCRAPER_TOKEN` 保护抓取器公网查询接口；tracking 网站另有每 IP 每分钟 30 次、同时 4 次的查询上限。两个 `/health` 可公开，但不会返回轨迹或令牌。
