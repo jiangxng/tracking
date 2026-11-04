@@ -1,0 +1,6 @@
+# Add as a separate site block to the existing /opt/evo-tokyo/Caddyfile.
+# The scraper itself requires a bearer token on tracking routes.
+scraper.43.167.252.197.sslip.io {
+    encode gzip
+    reverse_proxy tracking-scraper:8080
+}

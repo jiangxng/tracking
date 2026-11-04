@@ -1,0 +1,26 @@
+name: tracking-scraper
+
+services:
+  scraper:
+    image: ghcr.io/plhery/universal-parcel-scraper:0.637.1
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      SCRAPER_TOKEN: ${SCRAPER_TOKEN:?set_in_private_env_file}
+      SCRAPER_MAX_CONCURRENT: "2"
+      SCRAPER_RATE_LIMIT: "20"
+      SCRAPER_CACHE_MS: "600000"
+    expose:
+      - "8080"
+    networks:
+      evo:
+        aliases:
+          - tracking-scraper
+    logging:
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  evo:
+    external: true
+    name: ${EVO_NETWORK:-evo-tokyo-dev_internal}
