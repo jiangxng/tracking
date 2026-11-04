@@ -40,8 +40,8 @@ function readQueryOptions() {
 function renderCouriers() {
   const term=$('carrier-search').value.toLowerCase();
   const list=couriers.filter(c=>`${c.name} ${c.code} ${c.country}`.toLowerCase().includes(term));
-  $('carrier-summary').textContent=couriers.length ? `服务端返回 ${couriers.length} 家可用承运商，匹配 ${list.length} 家。` : '尚未取得承运商目录，请先配置 Ship24 API。';
-  $('carrier-results').innerHTML=list.slice(0,100).map(c=>`<div class="carrier-row"><strong>${escape(c.name)}</strong><span>${escape(c.code)} · ${escape(c.country)}</span>${c.requiredFields.length?`<small>需补充：${escape(c.requiredFields.join(' / '))}</small>`:''}</div>`).join('')+(list.length>100?'<p>当前显示前 100 家，请输入关键词缩小范围。</p>':'');
+  $('carrier-summary').textContent=`本项目有 ${couriers.length} 个接入入口，当前匹配 ${list.length} 个。Karrio 实际可用承运商取决于自托管实例及各物流商授权。`;
+  $('carrier-results').innerHTML=list.map(c=>`<div class="carrier-row"><strong>${escape(c.name)}</strong><span>${escape(c.code)} · ${c.enabled?'已配置':'待配置'}</span></div>`).join('');
 }
 async function loadConnection() {
   $('check-connection').disabled=true;
@@ -49,25 +49,18 @@ async function loadConnection() {
     const response=await fetch('/api/config',{cache:'no-store'});
     if(!response.ok) throw new Error('无法读取配置，请确认已登录。');
     const config=await response.json();
-    $('service-title').textContent=config.enabled?'全球物流已配置 · 众乐可用':'全球物流待启用 · 众乐可用';
-    $('service-message').textContent=config.enabled?'通过 Ship24 自动识别承运商并获取轨迹。首次查询可能需要约 1 分钟。':'已完成 Ship24 接口开发，尚未配置 API 密钥。国际大厂与其他承运商的实时查询暂不可用。';
-    $('setup-status').textContent=config.enabled?'服务端已配置 Ship24 密钥，正在核验承运商目录。':'当前缺少 Ship24 API 密钥。配置完成后才能查询多承运商真实轨迹。';
-    couriers=[];
-    if(config.enabled) {
-      const r=await fetch('/api/couriers',{cache:'no-store'}),data=await r.json();
-      if(!r.ok) throw new Error(data.error||'无法加载承运商目录。');
-      couriers=data.couriers||[];
-      $('setup-status').textContent=`连接已验证，载入 ${couriers.length} 家可用承运商。具体运单仍需实际查询。`;
-      $('courier-hint').textContent=`可搜索 ${couriers.length} 家承运商；留空则自动识别。`;
-    }
-    $('courier-list').innerHTML=couriers.map(c=>`<option value="${escape(c.code)}">${escape(c.name)} · ${escape(c.country)}</option>`).join('');
-    $('courier-code').disabled=busy||!couriers.length;
-    $('connection-result').textContent=config.enabled?'承运商目录已更新。':'尚未配置 API 密钥。';
+    const enabled=config.providers.filter(p=>p.enabled);
+    $('service-title').textContent='免费数据源 · '+enabled.map(p=>p.name).join(' / ');
+    $('service-message').textContent='已接入 '+enabled.length+' / '+config.providers.length+' 个数据源。UPS、DHL、FedEx、USPS 需各自账号授权；Karrio 需自托管。';
+    $('setup-status').textContent=config.providers.map(p=>p.name+'：'+(p.enabled?'已配置':'待配置')).join('；');
+    $('connection-result').textContent='配置状态已更新。';
+    couriers=config.providers.map(p=>({...p,code:p.id,country:'',requiredFields:[]}));
+    $('courier-code').disabled=busy||$('provider').value!=='karrio';
+    $('courier-hint').textContent='Karrio 承运商代码，例如 ups、usps；其他数据源留空。';
     renderCouriers();
   } catch(e) {
-    $('service-title').textContent='全球物流连接待检查'; $('service-message').textContent=e.message;
+    $('service-title').textContent='数据源连接待检查'; $('service-message').textContent=e.message;
     $('connection-result').textContent=e.message; $('setup-status').textContent=e.message;
-    couriers=[]; $('courier-code').disabled=true;
   } finally { $('check-connection').disabled=false; }
 }
 const filterDefs = [['all','全部运单','box'],['transit','运输中 / 待发','truck'],['delivered','已签收','check'],['attention','异常 / 待处理','alert']];
@@ -75,7 +68,7 @@ function notify(message) { $('toast').textContent = message; $('toast').hidden =
 function countInput() { const n = parseNumbers($('numbers').value).length; $('input-count').textContent = `${n} / 20 个单号`; $('input-count').style.color = n > 20 ? '#b84c40' : ''; }
 function label(record) {
   if (record.state === 'success') return STATUS[record.shipment.status] || record.shipment.status || '状态未知';
-  return { pending: '等待查询', loading: '正在查询', missing: '众乐未返回记录', unconfigured:'全球查询待启用', waiting:'等待轨迹', ambiguous:'需要补充信息', error: '查询失败', cancelled: '已停止' }[record.state];
+  return { pending: '等待查询', loading: '正在查询', missing: '未查到', unconfigured:'数据源待配置', waiting:'等待轨迹', ambiguous:'需要补充信息', error: '查询失败', cancelled: '已停止' }[record.state];
 }
 function renderStats() {
   $('stats').innerHTML = filterDefs.map(([key, name, symbol]) => `<button class="stat ${key === currentFilter ? 'active' : ''}" data-filter="${key}" aria-pressed="${key === currentFilter}"><span class="stat-label">${icon(symbol)} ${name}</span><span class="stat-number">${key === 'all' ? records.length : records.filter(r => category(r) === key).length}<small>票</small></span></button>`).join('');
@@ -85,7 +78,7 @@ function renderStats() {
   $('query').disabled = busy;
   $('cancel').hidden = !busy;
   for (const id of ['provider','country-code','post-code','shipping-date']) $(id).disabled=busy;
-  $('courier-code').disabled=busy || !couriers.length;
+  $('courier-code').disabled=busy || $('provider').value!=='karrio';
   $('numbers').disabled = busy; $('example').disabled = busy; $('clear').disabled = busy;
 }
 function traceHTML(record, view) {
@@ -102,15 +95,15 @@ function cardHTML(record, index) {
   const c = category(record), s = record.shipment;
   const view = views.get(record.number) || { expanded: true, ascending: false, keyword: '' }; views.set(record.number, view);
   const badgeIcon = c === 'delivered' ? 'check' : c === 'attention' ? 'alert' : c === 'transit' ? 'truck' : 'clock';
-  const title = `<div class="shipment-head"><span class="shipment-icon">${icon('box')}</span><div class="shipment-name"><h3>${escape(record.number)}</h3><p>${s ? escape(s.outer_carrier_code || '国际物流') + ' · 国际货运' : (record.source === 'ship24' ? 'Ship24 · 全球物流' : '物流查询')}</p></div><div class="shipment-tools"><span class="badge ${c}">${icon(badgeIcon)}${escape(label(record))}</span><button class="icon-button" data-action="copy-number" aria-label="复制单号 ${escape(record.number)}" title="复制单号">${icon('copy')}</button></div></div>`;
+  const title = `<div class="shipment-head"><span class="shipment-icon">${icon('box')}</span><div class="shipment-name"><h3>${escape(record.number)}</h3><p>${s ? escape(s.outer_carrier_code || '国际物流') + ' · 国际货运' : (record.source ? record.source.toUpperCase()+' · 物流查询' : '物流查询')}</p></div><div class="shipment-tools"><span class="badge ${c}">${icon(badgeIcon)}${escape(label(record))}</span><button class="icon-button" data-action="copy-number" aria-label="复制单号 ${escape(record.number)}" title="复制单号">${icon('copy')}</button></div></div>`;
   if (!s) {
     const carrier = carrierLink(record.number);
     const unavailable = ['error', 'missing', 'unconfigured', 'waiting', 'ambiguous'].includes(record.state);
-    return `<article class="shipment" data-index="${index}">${title}<div class="message-card"><div><p>${escape(record.message || (record.state === 'loading' ? '正在查询物流数据，首次全球查询可能需要约 1 分钟…' : record.state === 'cancelled' ? '查询已停止，可点击刷新重新查询。' : '等待前面的运单查询完成…'))}</p>${unavailable ? `<p class="source-detail">${carrier ? '此单号符合 UPS 格式，也可前往 UPS 官网核验。' : (record.source === 'ship24' ? '可检查接入设置，或补充准确的承运商与目的地后重试。' : '如有对应的众乐系统单号或客户单号，可用它再次查询。')}</p>` : ''}${record.sourceMessage ? `<details class="source-detail"><summary>查看原站提示</summary>${escape(record.sourceMessage)}</details>` : ''}</div>${unavailable ? `<div class="fallback-actions">${carrier ? `<a class="primary carrier-link" href="${escape(carrier.url)}" target="_blank" rel="noopener noreferrer">${carrier.name} 官网查询 ↗</a>` : ''}<button class="secondary" data-action="retry" ${busy ? 'disabled' : ''}>重新查询</button></div>` : ''}</div>${record.state === 'loading' ? '<div class="pending-line"></div>' : ''}</article>`;
+    return `<article class="shipment" data-index="${index}">${title}<div class="message-card"><div><p>${escape(record.message || (record.state === 'loading' ? '正在查询物流数据，首次全球查询可能需要约 1 分钟…' : record.state === 'cancelled' ? '查询已停止，可点击刷新重新查询。' : '等待前面的运单查询完成…'))}</p>${unavailable ? `<p class="source-detail">${carrier ? '此单号符合 UPS 格式，也可前往 UPS 官网核验。' : (record.source !== 'zhongle' ? '可检查接入设置，或补充准确的承运商与目的地后重试。' : '如有对应的众乐系统单号或客户单号，可用它再次查询。')}</p>` : ''}${record.sourceMessage ? `<details class="source-detail"><summary>查看原站提示</summary>${escape(record.sourceMessage)}</details>` : ''}</div>${unavailable ? `<div class="fallback-actions">${carrier ? `<a class="primary carrier-link" href="${escape(carrier.url)}" target="_blank" rel="noopener noreferrer">${carrier.name} 官网查询 ↗</a>` : ''}<button class="secondary" data-action="retry" ${busy ? 'disabled' : ''}>重新查询</button></div>` : ''}</div>${record.state === 'loading' ? '<div class="pending-line"></div>' : ''}</article>`;
   }
   const datum = (name, value, cls = '') => `<div class="datum ${cls}"><label>${name}</label><div class="number">${escape(value || '—')}</div></div>`;
   const latest = s.traces[0];
-  return `<article class="shipment" data-index="${index}">${title}<div class="shipment-info">${datum('目的国家 / 地区',s.country)}${datum('目的地邮编',s.postcode)}${datum('包裹件数',s.parcel_count ? s.parcel_count + ' 件' : '')}${datum(record.source === 'ship24' ? '查询单号' : '系统单号',s.shipment_id)}${record.source === 'ship24' ? datum('运输服务',s.service) : datum('客户单号',s.client_reference)}${datum('转单号',s.outer_carrier_tracking_number,'transfer')}${s.ext_number ? datum('外部单号',s.ext_number) : ''}${s.eta ? datum('预计送达',s.eta) : ''}</div><div class="latest">${icon(badgeIcon)}<div class="latest-content"><strong>${escape(latest?.info || '等待物流轨迹更新')}</strong><small>${escape(latest?.time || '')}</small></div><button class="text-btn" data-action="toggle" aria-expanded="${view.expanded}" aria-controls="details-${index}">${view.expanded ? '收起轨迹' : '展开轨迹'} ${icon('chevron')}</button></div><div id="details-${index}" ${view.expanded ? '' : 'hidden'}><div class="timeline-toolbar"><strong>物流轨迹 <span>${s.traces.length} 条动态</span></strong><div class="timeline-controls"><input class="trace-search" aria-label="搜索 ${escape(record.number)} 的轨迹" placeholder="搜索轨迹" value="${escape(view.keyword)}"><button class="sort-button" data-action="sort">${view.ascending ? '↑ 最早在前' : '↓ 最新在前'}</button></div></div><ol class="timeline">${traceHTML(record, view)}</ol></div><div class="card-foot"><span>来源：${record.source === 'ship24' ? 'Ship24' : '众乐国际'} · 时间按源数据原样显示</span><div><button class="text-btn" data-action="copy-link" >复制查询链接</button><span> &nbsp; / &nbsp; </span>${record.source === 'ship24' ? (carrierLink(record.number) ? `<a href="${carrierLink(record.number).url}" target="_blank" rel="noopener noreferrer">承运商核验 ↗</a>` : 'Ship24 聚合轨迹') : `<a href="https://gzzlgj.nextsls.com/tracking/app#/tracking?numbers=${encodeURIComponent(record.number)}" target="_blank" rel="noopener noreferrer">原站核验 ↗</a>`}</div></div></article>`;
+  return `<article class="shipment" data-index="${index}">${title}<div class="shipment-info">${datum('目的国家 / 地区',s.country)}${datum('目的地邮编',s.postcode)}${datum('包裹件数',s.parcel_count ? s.parcel_count + ' 件' : '')}${datum(record.source !== 'zhongle' ? '查询单号' : '系统单号',s.shipment_id)}${record.source !== 'zhongle' ? datum('运输服务',s.service) : datum('客户单号',s.client_reference)}${datum('转单号',s.outer_carrier_tracking_number,'transfer')}${s.ext_number ? datum('外部单号',s.ext_number) : ''}${s.eta ? datum('预计送达',s.eta) : ''}</div><div class="latest">${icon(badgeIcon)}<div class="latest-content"><strong>${escape(latest?.info || '等待物流轨迹更新')}</strong><small>${escape(latest?.time || '')}</small></div><button class="text-btn" data-action="toggle" aria-expanded="${view.expanded}" aria-controls="details-${index}">${view.expanded ? '收起轨迹' : '展开轨迹'} ${icon('chevron')}</button></div><div id="details-${index}" ${view.expanded ? '' : 'hidden'}><div class="timeline-toolbar"><strong>物流轨迹 <span>${s.traces.length} 条动态</span></strong><div class="timeline-controls"><input class="trace-search" aria-label="搜索 ${escape(record.number)} 的轨迹" placeholder="搜索轨迹" value="${escape(view.keyword)}"><button class="sort-button" data-action="sort">${view.ascending ? '↑ 最早在前' : '↓ 最新在前'}</button></div></div><ol class="timeline">${traceHTML(record, view)}</ol></div><div class="card-foot"><span>来源：${record.source === 'zhongle' ? '众乐国际' : record.source.toUpperCase()} · 时间按源数据原样显示</span><div><button class="text-btn" data-action="copy-link" >复制查询链接</button><span> &nbsp; / &nbsp; </span>${record.source !== 'zhongle' ? (carrierLink(record.number) ? `<a href="${carrierLink(record.number).url}" target="_blank" rel="noopener noreferrer">承运商核验 ↗</a>` : '承运商轨迹') : `<a href="https://gzzlgj.nextsls.com/tracking/app#/tracking?numbers=${encodeURIComponent(record.number)}" target="_blank" rel="noopener noreferrer">原站核验 ↗</a>`}</div></div></article>`;
 }
 function render() {
   renderStats();
@@ -144,7 +137,7 @@ async function query(numbers, retryIndex = null) {
     catch (error) { if (id !== runId) break; records[i] = { number, state: 'error', queryOptions:currentOptions, message: timedOut ? '物流数据源响应超时，请稍后重试。' : error instanceof TypeError ? '暂时无法连接查询服务，请检查网络或登录状态。' : error.message }; }
     finally { clearTimeout(timer); }
     render();
-    if (step < indices.length - 1) await new Promise(resolve => setTimeout(resolve, 1000));
+    if (step < indices.length - 1) await new Promise(resolve => setTimeout(resolve, currentOptions.provider==='dhl' || currentOptions.provider==='auto' && /^\d{10}$/.test(number) ? 5000 : 1000));
   }
   if (id !== runId) return;
   controller = null; busy = false; updatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false }); $('query-status').textContent = completionText(); render();
@@ -183,6 +176,7 @@ for (const id of ['close-help','help-done']) $(id).addEventListener('click', () 
 $('setup').addEventListener('click',()=> $('setup-dialog').showModal());
 $('close-setup').addEventListener('click',()=> $('setup-dialog').close());
 $('check-connection').addEventListener('click',loadConnection);
+$('provider').addEventListener('change',()=>{$('courier-code').disabled=$('provider').value!=='karrio';});
 $('show-carriers').addEventListener('click',()=>{renderCouriers();$('carriers-dialog').showModal();});
 $('close-carriers').addEventListener('click',()=> $('carriers-dialog').close());
 $('carrier-search').addEventListener('input',renderCouriers);

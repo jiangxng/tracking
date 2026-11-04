@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { trackShipment } from '../../../lib/tracking-service.mjs';
+import { trackShipment } from '../../../lib/free-tracking-service.mjs';
 export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   const origin=request.headers.get('origin');

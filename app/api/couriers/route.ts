@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { getCouriers } from '../../../lib/tracking-service.mjs';
+import { getCouriers } from '../../../lib/free-tracking-service.mjs';
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {return Response.json(await getCouriers(env),{headers:{'Cache-Control':'private, max-age=300'}});}
