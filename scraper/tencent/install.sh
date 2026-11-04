@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run from the Tencent instance's terminal: sudo bash install.sh <verified tracking commit SHA>
+# Run as the existing evo-deploy account with a verified tracking commit SHA.
 sha="${1:-}"
 if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
   echo 'Provide the verified 40-character tracking Git commit SHA.' >&2
   exit 2
 fi
-if (( EUID != 0 )); then
-  echo 'Run as root with sudo so Docker and the existing Caddyfile can be updated.' >&2
+if [[ "$(id -un)" != evo-deploy ]]; then
+  echo 'Run as the existing evo-deploy account, which owns the Caddyfile and Docker deployment.' >&2
   exit 2
 fi
 
-root=/opt/tracking
+root=/home/evo-deploy/tracking
 release="$root/releases/$sha"
 evo_compose=/opt/evo-tokyo/compose.yaml
 evo_env=/opt/evo-tokyo/.env
