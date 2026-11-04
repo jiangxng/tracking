@@ -9,4 +9,6 @@
 5. 分别验证 `https://tracking.43.167.252.197.sslip.io/health` 和 `https://scraper.43.167.252.197.sslip.io/health`，并使用带令牌的 `POST /v1/track` 验证真实运单。只将令牌放在服务器和 Sites 服务端环境变量中。tracking 网站的 `/api/config` 应显示抓取服务已启用。
 6. 如果还要保留 Sites 网站作为第二入口，在 Sites 设置 `SCRAPER_BASE_URL=https://scraper.43.167.252.197.sslip.io` 及相同的 `SCRAPER_TOKEN`，重新部署已保存的网站版本。
 
+`install.sh` 可在实例终端用 `sudo bash install.sh <已核实的40位commit SHA>` 执行以上部署。脚本先核对 EVO Caddy、Docker 网络、至少约 1.2 GB 可用内存和 4 GB Docker 磁盘空间；不满足时会停止。它不会打印生成的抓取令牌。首次写入 Caddyfile 前会备份，验证或 reload 失败时恢复原文件。脚本要求服务器能访问 GitHub；请先在 GitHub 核对要部署的 SHA 与脚本内容。
+
 抓取项目对网页改版及网站验证敏感；`1Z1B0D750317229126` 的普通 HTTP 抓取已遇到验证拦截，Chromium 方式是否能取得轨迹必须在实际服务器上测试。此服务不使用 Railway，不依赖物流商 API 密钥。`SCRAPER_TOKEN` 保护抓取器公网查询接口；tracking 网站另有每 IP 每分钟 30 次、同时 4 次的查询上限。两个 `/health` 可公开，但不会返回轨迹或令牌。
