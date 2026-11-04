@@ -1,0 +1,10 @@
+FROM node:22.22.2-alpine
+WORKDIR /app
+COPY app/site.html app/site.html
+COPY public/ public/
+COPY lib/free-tracking-service.mjs lib/free-tracking-service.mjs
+COPY server/node-server.mjs server/node-server.mjs
+USER node
+ENV PORT=8081
+EXPOSE 8081
+CMD ["node", "server/node-server.mjs"]

@@ -31,6 +31,8 @@ npm run dev
 
 项目版本固定为 `universal-parcel-scraper@0.637.1`。本机可通过 `npm install -g universal-parcel-scraper@0.637.1` 后执行 `parcel-scraper serve --host 127.0.0.1 --port 8080`；启用浏览器抓取需 Chromium 及项目文档所列的可选依赖。也可使用 [官方 Docker 镜像](https://github.com/plhery/universal-parcel-scraper/pkgs/container/universal-parcel-scraper)（包含 Chromium），本仓库提供 [Docker Compose 示例](scraper/docker-compose.yml)。要供线上网站查询，应将抓取服务部署到自己控制的 HTTPS 主机，并设置长随机 `SCRAPER_TOKEN`；站点服务端配置相同的令牌。抓取服务自带缓存、限流和并发上限，站点不会把令牌发送给浏览器。
 
+腾讯云实例可同时部署 tracking 网站与抓取器，复用现有 Caddy 和 Docker 网络；步骤见 [腾讯云部署说明](scraper/tencent/README.md)。独立 Node 服务的入口为 `server/node-server.mjs`，不用 Sites 或物流商收费 API 才能运行。部署前应先确认实例剩余内存足够运行 Chromium。
+
 ```sh
 npm test
 npm run check

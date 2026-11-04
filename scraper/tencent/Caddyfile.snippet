@@ -4,3 +4,8 @@ scraper.43.167.252.197.sslip.io {
     encode gzip
     reverse_proxy tracking-scraper:8080
 }
+
+tracking.43.167.252.197.sslip.io {
+    encode gzip
+    reverse_proxy tracking-app:8081
+}

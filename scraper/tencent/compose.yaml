@@ -1,6 +1,23 @@
 name: tracking-scraper
 
 services:
+  tracking:
+    build:
+      context: ../..
+      dockerfile: scraper/tencent/Dockerfile.tracking
+    restart: unless-stopped
+    environment:
+      PORT: "8081"
+      SCRAPER_BASE_URL: https://scraper.43.167.252.197.sslip.io
+      SCRAPER_TOKEN: ${SCRAPER_TOKEN:?set_in_private_env_file}
+    expose:
+      - "8081"
+    networks:
+      evo:
+        aliases:
+          - tracking-app
+    logging:
+      options: {max-size: "10m", max-file: "3"}
   scraper:
     image: ghcr.io/plhery/universal-parcel-scraper:0.637.1
     restart: unless-stopped
